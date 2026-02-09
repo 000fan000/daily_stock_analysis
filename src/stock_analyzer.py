@@ -92,12 +92,15 @@ class TrendAnalysisResult:
     ma10: float = 0.0
     ma20: float = 0.0
     ma60: float = 0.0
+    ma250: float = 0.0
     current_price: float = 0.0
     
     # 乖离率（与 MA5 的偏离度）
     bias_ma5: float = 0.0            # (Close - MA5) / MA5 * 100
     bias_ma10: float = 0.0
     bias_ma20: float = 0.0
+    bias_ma60: float = 0.0
+    bias_ma250: float = 0.0
     
     # 量能分析
     volume_status: VolumeStatus = VolumeStatus.NORMAL
@@ -123,6 +126,31 @@ class TrendAnalysisResult:
     rsi_24: float = 0.0             # RSI(24) 长期
     rsi_status: RSIStatus = RSIStatus.NEUTRAL
     rsi_signal: str = ""              # RSI 信号描述
+
+    # KDJ 指标
+    kdj_k: float = 0.0              # K值
+    kdj_d: float = 0.0              # D值
+    kdj_j: float = 0.0              # J值
+    kdj_signal: str = ""            # KDJ信号描述
+
+    # 布林带指标
+    bb_upper: float = 0.0           # 布林带上轨
+    bb_middle: float = 0.0          # 布林带中轨（MA20）
+    bb_lower: float = 0.0           # 布林带下轨
+    bb_width: float = 0.0           # 布林带宽度
+    bb_position: str = ""           # 价格在布林带位置
+
+    # 动量指标
+    momentum_5d: float = 0.0         # 5日动量
+    momentum_10d: float = 0.0        # 10日动量
+    momentum_signal: str = ""        # 动量信号描述
+
+    # 量均线指标
+    vol_ma5: float = 0.0            # 5日量均线
+    vol_ma10: float = 0.0           # 10日量均线
+    vol_ma20: float = 0.0           # 20日量均线
+    vol_ratio_ma5: float = 0.0      # 量比（当日量/5日量均）
+    vol_trend: str = ""             # 量均线趋势
 
     # 买入信号
     buy_signal: BuySignal = BuySignal.WAIT
@@ -163,6 +191,26 @@ class TrendAnalysisResult:
             'rsi_24': self.rsi_24,
             'rsi_status': self.rsi_status.value,
             'rsi_signal': self.rsi_signal,
+            'ma250': self.ma250,
+            'bias_ma60': self.bias_ma60,
+            'bias_ma250': self.bias_ma250,
+            'kdj_k': self.kdj_k,
+            'kdj_d': self.kdj_d,
+            'kdj_j': self.kdj_j,
+            'kdj_signal': self.kdj_signal,
+            'bb_upper': self.bb_upper,
+            'bb_middle': self.bb_middle,
+            'bb_lower': self.bb_lower,
+            'bb_width': self.bb_width,
+            'bb_position': self.bb_position,
+            'momentum_5d': self.momentum_5d,
+            'momentum_10d': self.momentum_10d,
+            'momentum_signal': self.momentum_signal,
+            'vol_ma5': self.vol_ma5,
+            'vol_ma10': self.vol_ma10,
+            'vol_ma20': self.vol_ma20,
+            'vol_ratio_ma5': self.vol_ratio_ma5,
+            'vol_trend': self.vol_trend,
         }
 
 
@@ -196,6 +244,21 @@ class StockTrendAnalyzer:
     RSI_LONG = 24              # 长期RSI周期
     RSI_OVERBOUGHT = 70        # 超买阈值
     RSI_OVERSOLD = 30          # 超卖阈值
+
+    # KDJ 参数
+    KDJ_PERIOD = 9             # KDJ计算周期
+    KDJ_K_PERIOD = 3           # K值平滑周期
+    KDJ_D_PERIOD = 3           # D值平滑周期
+    KDJ_OVERBOUGHT = 80        # KDJ超买阈值
+    KDJ_OVERSOLD = 20          # KDJ超卖阈值
+
+    # 布林带参数
+    BB_PERIOD = 20             # 布林带周期（通常使用MA20）
+    BB_STD_DEV = 2.0           # 标准差倍数
+
+    # 动量参数
+    MOMENTUM_SHORT = 5         # 短期动量周期
+    MOMENTUM_LONG = 10         # 长期动量周期
     
     def __init__(self):
         """初始化分析器"""
@@ -225,9 +288,13 @@ class StockTrendAnalyzer:
         # 计算均线
         df = self._calculate_mas(df)
 
-        # 计算 MACD 和 RSI
+        # 计算技术指标
         df = self._calculate_macd(df)
         df = self._calculate_rsi(df)
+        df = self._calculate_kdj(df)
+        df = self._calculate_bollinger_bands(df)
+        df = self._calculate_momentum(df)
+        df = self._calculate_volume_ma(df)
 
         # 获取最新数据
         latest = df.iloc[-1]
@@ -236,12 +303,27 @@ class StockTrendAnalyzer:
         result.ma10 = float(latest['MA10'])
         result.ma20 = float(latest['MA20'])
         result.ma60 = float(latest.get('MA60', 0))
+        result.ma250 = float(latest.get('MA250', 0))
 
         # 1. 趋势判断
         self._analyze_trend(df, result)
 
         # 2. 乖离率计算
         self._calculate_bias(result)
+
+        # 获取技术指标数据
+        latest = df.iloc[-1]
+        result.kdj_k = float(latest.get('KDJ_K', 0))
+        result.kdj_d = float(latest.get('KDJ_D', 0))
+        result.kdj_j = float(latest.get('KDJ_J', 0))
+        result.bb_upper = float(latest.get('BB_UPPER', 0))
+        result.bb_middle = float(latest.get('BB_MIDDLE', 0))
+        result.bb_lower = float(latest.get('BB_LOWER', 0))
+        result.momentum_5d = float(latest.get('MOMENTUM_5D', 0))
+        result.momentum_10d = float(latest.get('MOMENTUM_10D', 0))
+        result.vol_ma5 = float(latest.get('VOL_MA5', 0))
+        result.vol_ma10 = float(latest.get('VOL_MA10', 0))
+        result.vol_ma20 = float(latest.get('VOL_MA20', 0))
 
         # 3. 量能分析
         self._analyze_volume(df, result)
@@ -255,7 +337,19 @@ class StockTrendAnalyzer:
         # 6. RSI 分析
         self._analyze_rsi(df, result)
 
-        # 7. 生成买入信号
+        # 7. KDJ 分析
+        self._analyze_kdj(df, result)
+
+        # 8. 布林带分析
+        self._analyze_bollinger_bands(df, result)
+
+        # 9. 动量分析
+        self._analyze_momentum(df, result)
+
+        # 10. 量均线分析
+        self._analyze_volume_ma(df, result)
+
+        # 11. 生成买入信号
         self._generate_signal(result)
 
         return result
@@ -270,6 +364,13 @@ class StockTrendAnalyzer:
             df['MA60'] = df['close'].rolling(window=60).mean()
         else:
             df['MA60'] = df['MA20']  # 数据不足时使用 MA20 替代
+        
+        # 计算 MA250
+        if len(df) >= 250:
+            df['MA250'] = df['close'].rolling(window=250).mean()
+        else:
+            df['MA250'] = df['MA60']  # 数据不足时使用 MA60 替代
+            
         return df
 
     def _calculate_macd(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -323,8 +424,9 @@ class StockTrendAnalyzer:
             avg_loss = loss.rolling(window=period).mean()
 
             # 计算 RS 和 RSI
-            rs = avg_gain / avg_loss
-            rsi = 100 - (100 / (1 + rs))
+            with np.errstate(divide='ignore', invalid='ignore'):
+                rs = avg_gain / avg_loss
+                rsi = 100 - (100 / (1 + rs))
 
             # 填充 NaN 值
             rsi = rsi.fillna(50)  # 默认中性值
@@ -404,6 +506,10 @@ class StockTrendAnalyzer:
             result.bias_ma10 = (price - result.ma10) / result.ma10 * 100
         if result.ma20 > 0:
             result.bias_ma20 = (price - result.ma20) / result.ma20 * 100
+        if result.ma60 > 0:
+            result.bias_ma60 = (price - result.ma60) / result.ma60 * 100
+        if result.ma250 > 0:
+            result.bias_ma250 = (price - result.ma250) / result.ma250 * 100
     
     def _analyze_volume(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
         """
@@ -773,6 +879,192 @@ class StockTrendAnalyzer:
                 lines.append(f"   {risk}")
 
         return "\n".join(lines)
+
+    def _calculate_kdj(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        计算 KDJ 指标
+        
+        KDJ指标计算公式：
+        - RSV = (Close - Min(Low, n)) / (Max(High, n) - Min(Low, n)) * 100
+        - K = SMA(RSV, m1)
+        - D = SMA(K, m2)  
+        - J = 3*K - 2*D
+        """
+        df = df.copy()
+        
+        # 计算 RSV (未成熟随机值)
+        period = self.KDJ_PERIOD
+        low_min = df['low'].rolling(window=period).min()
+        high_max = df['high'].rolling(window=period).max()
+        
+        # 避免0除数
+        denominator = high_max - low_min
+        denominator = denominator.replace(0, np.nan)
+        
+        rsv = (df['close'] - low_min) / denominator * 100
+        rsv = rsv.fillna(50)  # 默认中性值
+        
+        # 计算 K 值 (SMA)
+        k_period = self.KDJ_K_PERIOD
+        df['KDJ_K'] = rsv.ewm(span=k_period, adjust=False).mean()
+        
+        # 计算 D 值 (SMA of K)
+        d_period = self.KDJ_D_PERIOD
+        df['KDJ_D'] = df['KDJ_K'].ewm(span=d_period, adjust=False).mean()
+        
+        # 计算 J 值
+        df['KDJ_J'] = 3 * df['KDJ_K'] - 2 * df['KDJ_D']
+        
+        return df
+
+    def _calculate_bollinger_bands(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        计算布林带指标
+        
+        布林带组成：
+        - 中轨：MA20
+        - 上轨：MA20 + 2*STD(20)
+        - 下轨：MA20 - 2*STD(20)
+        """
+        df = df.copy()
+        
+        period = self.BB_PERIOD
+        std_dev = self.BB_STD_DEV
+        
+        # 中轨 (MA20)
+        df['BB_MIDDLE'] = df['close'].rolling(window=period).mean()
+        
+        # 标准差
+        std = df['close'].rolling(window=period).std()
+        
+        # 上轨和下轨
+        df['BB_UPPER'] = df['BB_MIDDLE'] + std * std_dev
+        df['BB_LOWER'] = df['BB_MIDDLE'] - std * std_dev
+        
+        return df
+
+    def _calculate_momentum(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        计算动量指标
+        
+        动量 = (当前价格 - n日前价格) / n日前价格 * 100%
+        """
+        df = df.copy()
+        
+        # 短期动量 (5日)
+        df['MOMENTUM_5D'] = df['close'].pct_change(periods=self.MOMENTUM_SHORT) * 100
+        
+        # 长期动量 (10日)
+        df['MOMENTUM_10D'] = df['close'].pct_change(periods=self.MOMENTUM_LONG) * 100
+        
+        return df
+
+    def _calculate_volume_ma(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        计算量均线指标
+        """
+        df = df.copy()
+        
+        # 计算量均线
+        df['VOL_MA5'] = df['volume'].rolling(window=5).mean()
+        df['VOL_MA10'] = df['volume'].rolling(window=10).mean()
+        df['VOL_MA20'] = df['volume'].rolling(window=20).mean()
+        
+        return df
+
+    def _analyze_kdj(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+        """
+        分析 KDJ 指标
+        """
+        if len(df) < self.KDJ_PERIOD:
+            result.kdj_signal = "数据不足"
+            return
+
+        k, d, j = result.kdj_k, result.kdj_d, result.kdj_j
+        
+        # KDJ 信号判断
+        if k > self.KDJ_OVERBOUGHT and d > self.KDJ_OVERBOUGHT:
+            result.kdj_signal = f"⚠️ KDJ超买(K:{k:.1f}, D:{d:.1f})，短期回调风险"
+        elif k < self.KDJ_OVERSOLD and d < self.KDJ_OVERSOLD:
+            result.kdj_signal = f"⭐ KDJ超卖(K:{k:.1f}, D:{d:.1f})，反弹机会"
+        elif k > d and j > k:  # 金叉形态
+            result.kdj_signal = f"✅ KDJ金叉(K:{k:.1f}>D:{d:.1f})，趋势转强"
+        elif k < d and j < k:  # 死叉形态
+            result.kdj_signal = f"❌ KDJ死叉(K:{k:.1f}<D:{d:.1f})，趋势转弱"
+        else:
+            result.kdj_signal = f" KDJ中性(K:{k:.1f}, D:{d:.1f})"
+
+    def _analyze_bollinger_bands(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+        """
+        分析布林带指标
+        """
+        if len(df) < self.BB_PERIOD:
+            result.bb_position = "数据不足"
+            return
+
+        price = result.current_price
+        upper, middle, lower = result.bb_upper, result.bb_middle, result.bb_lower
+        
+        # 计算布林带宽度
+        if upper > 0 and lower > 0:
+            result.bb_width = (upper - lower) / middle * 100
+        
+        # 价格位置判断
+        if price >= upper:
+            result.bb_position = "上轨之上（超买区域）"
+        elif price >= middle:
+            result.bb_position = "中轨之上（多头区域）"
+        elif price >= lower:
+            result.bb_position = "中轨之下（空头区域）"
+        else:
+            result.bb_position = "下轨之下（超卖区域）"
+
+    def _analyze_momentum(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+        """
+        分析动量指标
+        """
+        if len(df) < self.MOMENTUM_LONG:
+            result.momentum_signal = "数据不足"
+            return
+
+        mom_5d, mom_10d = result.momentum_5d, result.momentum_10d
+        
+        # 动量信号判断
+        if mom_5d > 3 and mom_10d > 5:
+            result.momentum_signal = f"🚀 强势上涨(5日:{mom_5d:+.1f}%, 10日:{mom_10d:+.1f}%)"
+        elif mom_5d > 1 and mom_10d > 2:
+            result.momentum_signal = f"📈 温和上涨(5日:{mom_5d:+.1f}%, 10日:{mom_10d:+.1f}%)"
+        elif mom_5d < -3 and mom_10d < -5:
+            result.momentum_signal = f"📉 加速下跌(5日:{mom_5d:+.1f}%, 10日:{mom_10d:+.1f}%)"
+        elif mom_5d < -1 and mom_10d < -2:
+            result.momentum_signal = f"⚠️ 温和下跌(5日:{mom_5d:+.1f}%, 10日:{mom_10d:+.1f}%)"
+        else:
+            result.momentum_signal = f"➡️ 震荡整理(5日:{mom_5d:+.1f}%, 10日:{mom_10d:+.1f}%)"
+
+    def _analyze_volume_ma(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+        """
+        分析量均线指标
+        """
+        if len(df) < 20:
+            result.vol_trend = "数据不足"
+            return
+
+        current_vol = df.iloc[-1]['volume']
+        vol_ma5, vol_ma10, vol_ma20 = result.vol_ma5, result.vol_ma10, result.vol_ma20
+        
+        # 计算量比
+        if vol_ma5 > 0:
+            result.vol_ratio_ma5 = current_vol / vol_ma5
+        
+        # 量均线趋势判断
+        if vol_ma5 > vol_ma10 > vol_ma20:
+            result.vol_trend = "量均线多头排列，资金活跃"
+        elif vol_ma5 < vol_ma10 < vol_ma20:
+            result.vol_trend = "量均线空头排列，资金萎缩"
+        elif vol_ma5 > vol_ma10:
+            result.vol_trend = "短期量能增强"
+        else:
+            result.vol_trend = "量均线平衡"
 
 
 def analyze_stock(df: pd.DataFrame, code: str) -> TrendAnalysisResult:
