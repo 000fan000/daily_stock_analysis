@@ -330,7 +330,15 @@ class StockAnalysisPipeline:
         
         # 添加趋势分析结果
         if trend_result:
+            # 更新 today 数据，添加 MA60 和 MA250
+            if 'today' in enhanced:
+                enhanced['today'].update({
+                    'ma60': trend_result.ma60,
+                    'ma250': trend_result.ma250,
+                })
+            
             enhanced['trend_analysis'] = {
+                # 原有指标
                 'trend_status': trend_result.trend_status.value,
                 'ma_alignment': trend_result.ma_alignment,
                 'trend_strength': trend_result.trend_strength,
@@ -342,6 +350,36 @@ class StockAnalysisPipeline:
                 'signal_score': trend_result.signal_score,
                 'signal_reasons': trend_result.signal_reasons,
                 'risk_factors': trend_result.risk_factors,
+                
+                # 新增长期均线和乖离率
+                'bias_ma20': trend_result.bias_ma20,
+                'bias_ma60': trend_result.bias_ma60,
+                'bias_ma250': trend_result.bias_ma250,
+                
+                # KDJ 指标
+                'kdj_k': trend_result.kdj_k,
+                'kdj_d': trend_result.kdj_d,
+                'kdj_j': trend_result.kdj_j,
+                'kdj_signal': trend_result.kdj_signal,
+                
+                # 布林带指标
+                'bb_upper': trend_result.bb_upper,
+                'bb_middle': trend_result.bb_middle,
+                'bb_lower': trend_result.bb_lower,
+                'bb_width': trend_result.bb_width,
+                'bb_position': trend_result.bb_position,
+                
+                # 动量指标
+                'momentum_5d': trend_result.momentum_5d,
+                'momentum_10d': trend_result.momentum_10d,
+                'momentum_signal': trend_result.momentum_signal,
+                
+                # 量均线指标
+                'vol_ma5': trend_result.vol_ma5,
+                'vol_ma10': trend_result.vol_ma10,
+                'vol_ma20': trend_result.vol_ma20,
+                'vol_ratio_ma5': trend_result.vol_ratio_ma5,
+                'vol_trend': trend_result.vol_trend,
             }
         
         return enhanced

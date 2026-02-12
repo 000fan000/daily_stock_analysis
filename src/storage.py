@@ -82,7 +82,39 @@ class StockDaily(Base):
     ma5 = Column(Float)
     ma10 = Column(Float)
     ma20 = Column(Float)
+    ma60 = Column(Float)  # 长期均线
+    ma250 = Column(Float)  # 超长期均线
     volume_ratio = Column(Float)  # 量比
+    
+    # 乖离率
+    bias_ma5 = Column(Float)
+    bias_ma10 = Column(Float)
+    bias_ma20 = Column(Float)
+    bias_ma60 = Column(Float)
+    bias_ma250 = Column(Float)
+    
+    # KDJ 指标
+    kdj_k = Column(Float)
+    kdj_d = Column(Float)
+    kdj_j = Column(Float)
+    
+    # 布林带指标
+    bb_upper = Column(Float)
+    bb_middle = Column(Float)
+    bb_lower = Column(Float)
+    bb_width = Column(Float)
+    bb_position = Column(String(50))  # 价格在布林带位置
+    
+    # 动量指标
+    momentum_5d = Column(Float)
+    momentum_10d = Column(Float)
+    
+    # 量均线指标
+    vol_ma5 = Column(Float)
+    vol_ma10 = Column(Float)
+    vol_ma20 = Column(Float)
+    vol_ratio_ma5 = Column(Float)
+    vol_trend = Column(String(50))
     
     # 数据来源
     data_source = Column(String(50))  # 记录数据来源（如 AkshareFetcher）
@@ -389,7 +421,34 @@ class DatabaseManager:
                             ma5=row.get('ma5'),
                             ma10=row.get('ma10'),
                             ma20=row.get('ma20'),
+                            ma60=row.get('ma60'),
+                            ma250=row.get('ma250'),
                             volume_ratio=row.get('volume_ratio'),
+                            # 乖离率
+                            bias_ma5=row.get('bias_ma5'),
+                            bias_ma10=row.get('bias_ma10'),
+                            bias_ma20=row.get('bias_ma20'),
+                            bias_ma60=row.get('bias_ma60'),
+                            bias_ma250=row.get('bias_ma250'),
+                            # KDJ指标
+                            kdj_k=row.get('kdj_k'),
+                            kdj_d=row.get('kdj_d'),
+                            kdj_j=row.get('kdj_j'),
+                            # 布林带指标
+                            bb_upper=row.get('bb_upper'),
+                            bb_middle=row.get('bb_middle'),
+                            bb_lower=row.get('bb_lower'),
+                            bb_width=row.get('bb_width'),
+                            bb_position=row.get('bb_position'),
+                            # 动量指标
+                            momentum_5d=row.get('momentum_5d'),
+                            momentum_10d=row.get('momentum_10d'),
+                            # 量均线指标
+                            vol_ma5=row.get('vol_ma5'),
+                            vol_ma10=row.get('vol_ma10'),
+                            vol_ma20=row.get('vol_ma20'),
+                            vol_ratio_ma5=row.get('vol_ratio_ma5'),
+                            vol_trend=row.get('vol_trend'),
                             data_source=data_source,
                         )
                         session.add(record)
