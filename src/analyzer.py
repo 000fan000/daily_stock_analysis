@@ -1068,6 +1068,19 @@ class GeminiAnalyzer:
 | 20日量均 | {trend.get('vol_ma20', 0):,.0f} | |
 | 量比(5日) | {trend.get('vol_ratio_ma5', 0):.2f} | 相对强度 |
 | 量趋势 | {trend.get('vol_trend', '未知')} | |
+
+### 📈 指标历史走势（近10日）
+| 指标 | 今日 | 前1日 | 前2日 | 前3日 | 前4日 | 趋势说明 |
+|------|------|-------|-------|-------|-------|----------|
+| **收盘价** | {self._format_ts_value(trend.get('close_history', []), -1)} | {self._format_ts_value(trend.get('close_history', []), -2)} | {self._format_ts_value(trend.get('close_history', []), -3)} | {self._format_ts_value(trend.get('close_history', []), -4)} | {self._format_ts_value(trend.get('close_history', []), -5)} | {self._analyze_price_trend(trend)} |
+| **MA5** | {self._format_ts_value(trend.get('ma_history', []), -1)} | {self._format_ts_value(trend.get('ma_history', []), -2)} | {self._format_ts_value(trend.get('ma_history', []), -3)} | {self._format_ts_value(trend.get('ma_history', []), -4)} | {self._format_ts_value(trend.get('ma_history', []), -5)} | {self._analyze_ma_trend(trend.get('ma_history', []))} |
+| **KDJ-K** | {self._format_ts_value(trend.get('kdj_k_history', []), -1)} | {self._format_ts_value(trend.get('kdj_k_history', []), -2)} | {self._format_ts_value(trend.get('kdj_k_history', []), -3)} | {self._format_ts_value(trend.get('kdj_k_history', []), -4)} | {self._format_ts_value(trend.get('kdj_k_history', []), -5)} | {self._analyze_kdj_trend(trend)} |
+| **RSI(12)** | {self._format_ts_value(trend.get('rsi_12_history', []), -1)} | {self._format_ts_value(trend.get('rsi_12_history', []), -2)} | {self._format_ts_value(trend.get('rsi_12_history', []), -3)} | {self._format_ts_value(trend.get('rsi_12_history', []), -4)} | {self._format_ts_value(trend.get('rsi_12_history', []), -5)} | {self._analyze_rsi_trend(trend)} |
+| **MACD(DIF)** | {self._format_ts_value(trend.get('macd_dif_history', []), -1, decimals=3)} | {self._format_ts_value(trend.get('macd_dif_history', []), -2, decimals=3)} | {self._format_ts_value(trend.get('macd_dif_history', []), -3, decimals=3)} | {self._format_ts_value(trend.get('macd_dif_history', []), -4, decimals=3)} | {self._format_ts_value(trend.get('macd_dif_history', []), -5, decimals=3)} | {self._analyze_macd_trend(trend)} |
+| **成交量(万)** | {self._format_volume_ts(trend.get('volume_history', []), -1)} | {self._format_volume_ts(trend.get('volume_history', []), -2)} | {self._format_volume_ts(trend.get('volume_history', []), -3)} | {self._format_volume_ts(trend.get('volume_history', []), -4)} | {self._format_volume_ts(trend.get('volume_history', []), -5)} | {self._analyze_volume_trend(trend)} |
+
+#### 📈 技术指标时间序列（理解趋势变化）
+
 """
         
         # 添加昨日对比数据
@@ -1164,6 +1177,129 @@ class GeminiAnalyzer:
             return f"{amount / 1e4:.2f} 万元"
         else:
             return f"{amount:.0f} 元"
+    
+    def _format_ts_value(self, history: List, index: int, decimals: int = 2) -> str:
+        """格式化时间序列中的单个值"""
+        if not history or len(history) == 0:
+            return 'N/A'
+        try:
+            value = history[index]
+            if value is None:
+                return 'N/A'
+            return f"{value:.{decimals}f}"
+        except (IndexError, TypeError):
+            return 'N/A'
+    
+    def _format_volume_ts(self, history: List, index: int) -> str:
+        """格式化成交量时间序列值"""
+        if not history or len(history) == 0:
+            return 'N/A'
+        try:
+            value = history[index]
+            if value is None:
+                return 'N/A'
+            return f"{value / 1e4:.1f}"
+        except (IndexError, TypeError):
+            return 'N/A'
+    
+    def _analyze_price_trend(self, trend: Dict) -> str:
+        """分析价格趋势"""
+        close_history = trend.get('close_history', [])
+        if len(close_history) < 3:
+            return '数据不足'
+        recent = close_history[-1]
+        older = close_history[-3]
+        if recent > older * 1.02:
+            return '📈 上涨趋势'
+        elif recent < older * 0.98:
+            return '📉 下跌趋势'
+        else:
+            return '➡️ 震荡整理'
+    
+    def _analyze_ma_trend(self, ma_history: List) -> str:
+        """分析均线趋势"""
+        if not ma_history or len(ma_history) < 3:
+            return '数据不足'
+        recent = ma_history[-1]
+        older = ma_history[-3]
+        if recent > older:
+            return '↗️ 向上'
+        elif recent < older:
+            return '↘️ 向下'
+        else:
+            return '➡️ 平稳'
+    
+    def _analyze_kdj_trend(self, trend: Dict) -> str:
+        """分析KDJ趋势"""
+        k_history = trend.get('kdj_k_history', [])
+        d_history = trend.get('kdj_d_history', [])
+        if len(k_history) < 2:
+            return '数据不足'
+        # 金叉/死叉判断
+        if k_history[-1] > d_history[-1] and k_history[-2] <= d_history[-2]:
+            return '✅ 金叉'
+        elif k_history[-1] < d_history[-1] and k_history[-2] >= d_history[-2]:
+            return '❌ 死叉'
+        elif k_history[-1] > d_history[-1]:
+            return '↗️ 多头'
+        else:
+            return '↘️ 空头'
+    
+    def _analyze_rsi_trend(self, trend: Dict) -> str:
+        """分析RSI趋势"""
+        rsi_history = trend.get('rsi_12_history', [])
+        if len(rsi_history) < 3:
+            return '数据不足'
+        recent = rsi_history[-1]
+        older = rsi_history[-3]
+        if recent > 70:
+            return '⚠️ 超买'
+        elif recent < 30:
+            return '⭐ 超卖'
+        elif recent > older:
+            return '↗️ 走强'
+        elif recent < older:
+            return '↘️ 走弱'
+        else:
+            return '➡️ 震荡'
+    
+    def _analyze_macd_trend(self, trend: Dict) -> str:
+        """分析MACD趋势"""
+        dif_history = trend.get('macd_dif_history', [])
+        dea_history = trend.get('macd_dea_history', [])
+        if len(dif_history) < 2 or len(dea_history) < 2:
+            return '数据不足'
+        # 金叉/死叉判断
+        if dif_history[-1] > dea_history[-1] and dif_history[-2] <= dea_history[-2]:
+            return '✅ 金叉'
+        elif dif_history[-1] < dea_history[-1] and dif_history[-2] >= dea_history[-2]:
+            return '❌ 死叉'
+        elif dif_history[-1] > 0:
+            return '↗️ 多头'
+        else:
+            return '↘️ 空头'
+    
+    def _analyze_volume_trend(self, trend: Dict) -> str:
+        """分析成交量趋势"""
+        vol_history = trend.get('volume_history', [])
+        vol_ma5_history = trend.get('vol_ma5_history', [])
+        if len(vol_history) < 3 or len(vol_ma5_history) < 3:
+            return '数据不足'
+        recent = vol_history[-1]
+        ma5 = vol_ma5_history[-1]
+        if ma5 > 0:
+            ratio = recent / ma5
+            if ratio > 1.5:
+                return '📈 放量上涨'
+            elif ratio < 0.7:
+                return '📉 缩量回调'
+            else:
+                return '➡️ 正常量能'
+        return '➡️ 正常'
+    
+    def _format_time_series(self, trend: Dict) -> str:
+        """格式化完整时间序列摘要"""
+        return ""
     
     def _parse_response(
         self, 

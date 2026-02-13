@@ -90,7 +90,7 @@ class MarketAnalyzer:
     def __init__(self, search_service: Optional[SearchService] = None, analyzer=None):
         """
         初始化大盘分析器
-
+        
         Args:
             search_service: 搜索服务实例
             analyzer: AI分析器实例（用于调用LLM）
@@ -98,7 +98,13 @@ class MarketAnalyzer:
         self.config = get_config()
         self.search_service = search_service
         self.analyzer = analyzer
-        self.data_manager = DataFetcherManager()
+        # 初始化数据管理器用于获取板块数据
+        try:
+            from data_provider import DataFetcherManager
+            self.data_manager = DataFetcherManager()
+        except Exception as e:
+            logger.warning(f"[大盘] 初始化数据管理器失败: {e}")
+            self.data_manager = None
 
     def get_market_overview(self) -> MarketOverview:
         """
@@ -508,3 +514,66 @@ if __name__ == "__main__":
     report = analyzer._generate_template_review(overview, [])
     print(f"\n=== 复盘报告 ===")
     print(report)
+    
+    def get_sector_rankings(self, n: int = 5) -> Optional[Tuple[List[Dict], List[Dict]]]:
+        """
+        获取板块涨跌榜
+        
+        Args:
+            n: 返回前n个
+            
+        Returns:
+            Tuple: (领涨板块列表, 领跌板块列表)
+        """
+        if not self.data_manager:
+            logger.warning("[大盘] 数据管理器未初始化，无法获取板块排行")
+            return None
+        
+        try:
+            logger.info(f"[大盘] 获取板块涨跌榜（前{n}个）")
+            
+            # 从任一数据源获取板块数据
+            top_sectors, bottom_sectors = self.data_manager.get_sector_rankings(n)
+            
+            if top_sectors and bottom_sectors:
+                logger.info(f"[大盘] 成功获取板块排行数据")
+                logger.debug(f"[大盘] 领涨板块: {[s.get('name', s.get('name', '')) for s in top_sectors[:3]]}")
+                logger.debug(f"[大盘] 领跌板块: {[s.get('name', s.get('name', '')) for s in bottom_sectors[:3]]}")
+            
+            return top_sectors, bottom_sectors
+            
+        except Exception as e:
+            logger.error(f"[大盘] 获取板块涨跌榜失败: {e}")
+            return None
+    
+    def get_market_stats(self) -> Optional[Dict[str, Any]]:
+        """
+        获取市场涨跌统计
+        
+        Returns:
+            Dict: 包含:
+                - up_count: 上涨家数
+                - down_count: 下跌家数
+                - flat_count: 平盘家数
+                - limit_up_count: 涨停家数
+                - limit_down_count: 跌停家数
+                - total_amount: 两市成交额
+        """
+        if not self.data_manager:
+            logger.warning("[大盘] 数据管理器未初始化，无法获取市场统计")
+            return None
+            
+        try:
+            logger.info("[大盘] 获取市场涨跌统计")
+            
+            # 从任一数据源获取市场统计
+            stats = self.data_manager.get_market_stats()
+            
+            if stats:
+                logger.info(f"[大盘] 成功获取市场统计: 上涨{stats.get('up_count', 0)}家, 下跌{stats.get('down_count', 0)}家")
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"[大盘] 获取市场统计失败: {e}")
+            return None

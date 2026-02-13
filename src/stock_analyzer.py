@@ -151,6 +151,48 @@ class TrendAnalysisResult:
     vol_ma20: float = 0.0           # 20日量均线
     vol_ratio_ma5: float = 0.0      # 量比（当日量/5日量均）
     vol_trend: str = ""             # 量均线趋势
+    
+    # ========== 时间序列数据（用于趋势分析）==========
+    # 均线时间序列
+    ma_history: List[float] = field(default_factory=list)  # MA5历史
+    ma10_history: List[float] = field(default_factory=list)
+    ma20_history: List[float] = field(default_factory=list)
+    ma60_history: List[float] = field(default_factory=list)
+    ma250_history: List[float] = field(default_factory=list)
+    
+    # KDJ时间序列
+    kdj_k_history: List[float] = field(default_factory=list)
+    kdj_d_history: List[float] = field(default_factory=list)
+    kdj_j_history: List[float] = field(default_factory=list)
+    
+    # RSI时间序列
+    rsi_6_history: List[float] = field(default_factory=list)
+    rsi_12_history: List[float] = field(default_factory=list)
+    rsi_24_history: List[float] = field(default_factory=list)
+    
+    # MACD时间序列
+    macd_dif_history: List[float] = field(default_factory=list)
+    macd_dea_history: List[float] = field(default_factory=list)
+    macd_bar_history: List[float] = field(default_factory=list)
+    
+    # 布林带时间序列
+    bb_upper_history: List[float] = field(default_factory=list)
+    bb_middle_history: List[float] = field(default_factory=list)
+    bb_lower_history: List[float] = field(default_factory=list)
+    bb_width_history: List[float] = field(default_factory=list)
+    
+    # 动量时间序列
+    momentum_5d_history: List[float] = field(default_factory=list)
+    momentum_10d_history: List[float] = field(default_factory=list)
+    
+    # 成交量时间序列
+    volume_history: List[float] = field(default_factory=list)
+    vol_ma5_history: List[float] = field(default_factory=list)
+    vol_ma10_history: List[float] = field(default_factory=list)
+    
+    # 收盘价时间序列（用于画图和分析）
+    close_history: List[float] = field(default_factory=list)
+    date_history: List[str] = field(default_factory=list)
 
     # 买入信号
     buy_signal: BuySignal = BuySignal.WAIT
@@ -211,6 +253,32 @@ class TrendAnalysisResult:
             'vol_ma20': self.vol_ma20,
             'vol_ratio_ma5': self.vol_ratio_ma5,
             'vol_trend': self.vol_trend,
+            
+            # 时间序列数据
+            'close_history': self.close_history[-10:] if self.close_history else [],
+            'date_history': self.date_history[-10:] if self.date_history else [],
+            'ma_history': self.ma_history[-10:] if self.ma_history else [],
+            'ma10_history': self.ma10_history[-10:] if self.ma10_history else [],
+            'ma20_history': self.ma20_history[-10:] if self.ma20_history else [],
+            'ma60_history': self.ma60_history[-10:] if self.ma60_history else [],
+            'kdj_k_history': self.kdj_k_history[-10:] if self.kdj_k_history else [],
+            'kdj_d_history': self.kdj_d_history[-10:] if self.kdj_d_history else [],
+            'kdj_j_history': self.kdj_j_history[-10:] if self.kdj_j_history else [],
+            'rsi_6_history': self.rsi_6_history[-10:] if self.rsi_6_history else [],
+            'rsi_12_history': self.rsi_12_history[-10:] if self.rsi_12_history else [],
+            'rsi_24_history': self.rsi_24_history[-10:] if self.rsi_24_history else [],
+            'macd_dif_history': self.macd_dif_history[-10:] if self.macd_dif_history else [],
+            'macd_dea_history': self.macd_dea_history[-10:] if self.macd_dea_history else [],
+            'macd_bar_history': self.macd_bar_history[-10:] if self.macd_bar_history else [],
+            'bb_upper_history': self.bb_upper_history[-10:] if self.bb_upper_history else [],
+            'bb_middle_history': self.bb_middle_history[-10:] if self.bb_middle_history else [],
+            'bb_lower_history': self.bb_lower_history[-10:] if self.bb_lower_history else [],
+            'bb_width_history': self.bb_width_history[-10:] if self.bb_width_history else [],
+            'momentum_5d_history': self.momentum_5d_history[-10:] if self.momentum_5d_history else [],
+            'momentum_10d_history': self.momentum_10d_history[-10:] if self.momentum_10d_history else [],
+            'volume_history': self.volume_history[-10:] if self.volume_history else [],
+            'vol_ma5_history': self.vol_ma5_history[-10:] if self.vol_ma5_history else [],
+            'vol_ma10_history': self.vol_ma10_history[-10:] if self.vol_ma10_history else [],
         }
 
 
@@ -352,7 +420,94 @@ class StockTrendAnalyzer:
         # 11. 生成买入信号
         self._generate_signal(result)
 
+        # 11. 提取时间序列数据
+        self._extract_time_series(df, result)
+
         return result
+    
+    def _extract_time_series(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+        """
+        提取时间序列数据用于趋势分析
+        
+        提取最近N天的各项指标历史数据，帮助理解指标变化趋势
+        """
+        # 获取最近10天数据
+        n_days = min(10, len(df))
+        recent_df = df.tail(n_days)
+        
+        # 收盘价和日期
+        result.close_history = recent_df['close'].tolist()
+        if 'date' in recent_df.columns:
+            result.date_history = recent_df['date'].dt.strftime('%m-%d').tolist() if hasattr(recent_df['date'], 'dt') else [str(d)[:10] for d in recent_df['date'].tolist()]
+        
+        # 均线历史
+        if 'MA5' in recent_df.columns:
+            result.ma_history = recent_df['MA5'].fillna(0).tolist()
+        if 'MA10' in recent_df.columns:
+            result.ma10_history = recent_df['MA10'].fillna(0).tolist()
+        if 'MA20' in recent_df.columns:
+            result.ma20_history = recent_df['MA20'].fillna(0).tolist()
+        if 'MA60' in recent_df.columns:
+            result.ma60_history = recent_df['MA60'].fillna(0).tolist()
+        
+        # KDJ历史
+        if 'KDJ_K' in recent_df.columns:
+            result.kdj_k_history = recent_df['KDJ_K'].fillna(50).tolist()
+        if 'KDJ_D' in recent_df.columns:
+            result.kdj_d_history = recent_df['KDJ_D'].fillna(50).tolist()
+        if 'KDJ_J' in recent_df.columns:
+            result.kdj_j_history = recent_df['KDJ_J'].fillna(50).tolist()
+        
+        # RSI历史
+        if 'RSI_6' in recent_df.columns:
+            result.rsi_6_history = recent_df['RSI_6'].fillna(50).tolist()
+        if 'RSI_12' in recent_df.columns:
+            result.rsi_12_history = recent_df['RSI_12'].fillna(50).tolist()
+        if 'RSI_24' in recent_df.columns:
+            result.rsi_24_history = recent_df['RSI_24'].fillna(50).tolist()
+        
+        # MACD历史
+        if 'MACD_DIF' in recent_df.columns:
+            result.macd_dif_history = recent_df['MACD_DIF'].fillna(0).tolist()
+        if 'MACD_DEA' in recent_df.columns:
+            result.macd_dea_history = recent_df['MACD_DEA'].fillna(0).tolist()
+        if 'MACD_BAR' in recent_df.columns:
+            result.macd_bar_history = recent_df['MACD_BAR'].fillna(0).tolist()
+        
+        # 布林带历史
+        if 'BB_UPPER' in recent_df.columns:
+            result.bb_upper_history = recent_df['BB_UPPER'].fillna(0).tolist()
+        if 'BB_MIDDLE' in recent_df.columns:
+            result.bb_middle_history = recent_df['BB_MIDDLE'].fillna(0).tolist()
+        if 'BB_LOWER' in recent_df.columns:
+            result.bb_lower_history = recent_df['BB_LOWER'].fillna(0).tolist()
+        
+        # 计算布林带宽度历史
+        if result.bb_upper_history and result.bb_lower_history and result.bb_middle_history:
+            result.bb_width_history = [
+                (upper - lower) / middle * 100 
+                for upper, lower, middle in zip(
+                    result.bb_upper_history, 
+                    result.bb_lower_history, 
+                    result.bb_middle_history
+                )
+                if middle > 0
+            ]
+        
+        # 动量历史
+        if 'MOMENTUM_5D' in recent_df.columns:
+            result.momentum_5d_history = recent_df['MOMENTUM_5D'].fillna(0).tolist()
+        if 'MOMENTUM_10D' in recent_df.columns:
+            result.momentum_10d_history = recent_df['MOMENTUM_10D'].fillna(0).tolist()
+        
+        # 成交量历史
+        result.volume_history = recent_df['volume'].fillna(0).tolist()
+        
+        # 量均线历史
+        if 'VOL_MA5' in recent_df.columns:
+            result.vol_ma5_history = recent_df['VOL_MA5'].fillna(0).tolist()
+        if 'VOL_MA10' in recent_df.columns:
+            result.vol_ma10_history = recent_df['VOL_MA10'].fillna(0).tolist()
     
     def _calculate_mas(self, df: pd.DataFrame) -> pd.DataFrame:
         """计算均线"""
